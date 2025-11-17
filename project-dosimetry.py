@@ -1,12 +1,9 @@
 import streamlit as st
 import datetime
+import pandas as pd
+import altair as alt
 
-# --- FUNÇÃO AUXILIAR ---
 def parse_fraction(frac_str: str) -> float:
-    """
-    Converte uma string de fração (ex: '1/3', '2/5') ou decimal (ex: '0.5')
-    em um número float.
-    """
     try:
         if "/" in frac_str:
             num, den = frac_str.strip().split('/')
@@ -14,22 +11,17 @@ def parse_fraction(frac_str: str) -> float:
                 return 0.0
             return float(num) / float(den)
         else:
-            # Permite também a inserção de números decimais (ex: 0.5)
             return float(frac_str.strip().replace(",", "."))
     except (ValueError, TypeError, ZeroDivisionError):
-        # Retorna 0.0 se a string for inválida (ex: 'abc')
         return 0.0
 
-# --- INÍCIO DA APLICAÇÃO ---
 st.set_page_config(layout="wide")
 
-# --- ADIÇÃO DA LOGO AQUI ---
-st.image("logo_fgv_dosimetria.png", width=200) # <- CAMINHO E LARGURA AJUSTÁVEIS
+st.image("logo_fgv_dosimetria.png", width=200)
 
 st.title("⚖️ Calculadora de Dosimetria da Pena")
 st.markdown("Simulador do Método Trifásico (Art. 68 do Código Penal)")
 
-# --- CRIAÇÃO DAS ABAS ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🏁 Penas Cominadas", 
     "1️⃣ Fase 1: Pena-Base", 
@@ -38,8 +30,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Resultado Final"
 ])
 
-
-# --- ABA 1: PENAS COMINADAS E TERMO MÉDIO ---
 with tab1:
     st.header("Penas Cominadas e Termo Médio")
 
@@ -50,7 +40,6 @@ with tab1:
         help="Se for qualificado, as penas anteriores serão desconsideradas."
     )
 
-    # Define as penas com base no tipo de crime
     if tipo_crime == "Simples":
         col1, col2 = st.columns(2)
         with col1:
@@ -77,17 +66,13 @@ with tab1:
                 min_value=pena_minima_cominada, value=8.0, step=0.1, format="%.2f", key="max_qual"
             )
 
-    # Validação básica
     if pena_maxima_cominada < pena_minima_cominada:
         st.error("A pena máxima não pode ser menor que a pena mínima.")
         st.stop()
 
-    # Cálculo do Termo Médio
     termo_medio = (pena_maxima_cominada + pena_minima_cominada) / 2
     st.metric("Termo Médio:", f"{termo_medio:.2f} anos")
 
-
-# --- ABA 2: FASE 1: PENA-BASE ---
 with tab2:
     st.header("1ª Fase: Pena-Base (Circunstâncias Judiciais - Art. 59)")
 
@@ -100,7 +85,6 @@ with tab2:
     negativas = []
     st.write("Selecione as circunstâncias judiciais valoradas negativamente:")
 
-    # Cria 4 colunas para os checkboxes ficarem mais organizados
     cols_fase1 = st.columns(4)
     for i, circ in enumerate(circunstancias):
         if cols_fase1[i % 4].checkbox(circ):
@@ -109,8 +93,7 @@ with tab2:
     count_negativas = len(negativas)
     st.info(f"**Total de circunstâncias negativas:** {count_negativas}")
 
-    # Lógica de cálculo da Pena-Base
-    pena_base = pena_minima_cominada  # Começa no mínimo legal
+    pena_base = pena_minima_cominada
     intervalo_pena = pena_maxima_cominada - pena_minima_cominada
 
     if 0 < count_negativas <= 3:
@@ -124,10 +107,9 @@ with tab2:
 
         if fracao_tipo == "1/8":
             aumento_por_circunstancia = (1/8) * intervalo_pena
-        else:  # 1/6
+        else:
             aumento_por_circunstancia = (1/6) * intervalo_pena
 
-        # Aumento "separadamente" (sem cascata), como solicitado
         aumento_total = aumento_por_circunstancia * count_negativas
         pena_base = pena_minima_cominada + aumento_total
 
@@ -138,12 +120,8 @@ with tab2:
     elif count_negativas >= 4:
         st.subheader("Cálculo para 4+ circunstâncias negativas (Conjunto Desvalioso)")
         st.info("Para 4 ou mais circunstâncias (ou todas as 8), a pena-base deve se aproximar ou se igualar ao Termo Médio.")
-        # Implementando a regra de "igualar ao Termo Médio"
         pena_base = termo_medio
-    
-    # Se não houver negativas, a pena_base continua sendo a pena_minima_cominada (definida no início)
 
-    # Aplica a limitação da 1ª fase (não pode passar do máximo nem ficar abaixo do mínimo)
     if pena_base > pena_maxima_cominada:
         pena_base = pena_maxima_cominada
     if pena_base < pena_minima_cominada:
@@ -151,12 +129,10 @@ with tab2:
 
     st.metric("Pena-Base (Resultado da 1ª Fase):", f"{pena_base:.2f} anos")
 
-
-# --- ABA 3: FASE 2: PENA-PROVISÓRIA ---
 with tab3:
     st.header("2ª Fase: Pena-Provisória (Atenuantes e Agravantes)")
 
-    pena_provisoria = pena_base  # Começa com a pena-base
+    pena_provisoria = pena_base
 
     col3, col4 = st.columns(2)
     with col3:
@@ -168,21 +144,16 @@ with tab3:
             "Informe o número de AGRAVANTES:", min_value=0, step=1
         )
 
-    # "Elas equivalem sempre 1/6 da pena-base já definida"
     modificador_legal = (1/6) * pena_base
-
     st.info(f"Valor do modificador (1/6 da Pena-Base): {modificador_legal:.2f} anos")
 
-    # Lógica da compensação
     diferenca_circunstancias = num_agravantes - num_atenuantes
 
     if diferenca_circunstancias > 0:
-        # Mais agravantes que atenuantes
         aumento = modificador_legal * diferenca_circunstancias
         pena_provisoria = pena_base + aumento
         st.write(f"Preponderância de {diferenca_circunstancias} agravante(s): Aumento de {aumento:.2f} anos")
     elif diferenca_circunstancias < 0:
-        # Mais atenuantes que agravantes
         reducao = modificador_legal * abs(diferenca_circunstancias)
         pena_provisoria = pena_base - reducao
         st.write(f"Preponderância de {abs(diferenca_circunstancias)} atenuante(s): Redução de {reducao:.2f} anos")
@@ -190,7 +161,6 @@ with tab3:
         st.write("Agravantes e atenuantes se compensaram. A pena permanece inalterada.")
         pena_provisoria = pena_base
 
-    # Aplica a limitação da 2ª fase (Súmula 231 do STJ para atenuantes)
     if pena_provisoria > pena_maxima_cominada:
         pena_provisoria = pena_maxima_cominada
         st.warning("Pena provisória limitada à pena máxima cominada.")
@@ -200,16 +170,13 @@ with tab3:
 
     st.metric("Pena Provisória (Resultado da 2ª Fase):", f"{pena_provisoria:.2f} anos")
 
-
-# --- ABA 4: FASE 3: PENA DEFINITIVA ---
 with tab4:
     st.header("3ª Fase: Pena Definitiva (Causas de Aumento e Diminuição)")
     st.info("A ordem de cálculo é: 1º) Causas de Aumento, 2º) Causas de Diminuição.")
 
     pena_definitiva = pena_provisoria
-    pena_apos_aumento = pena_provisoria # Variável para guardar o resultado após o aumento
+    pena_apos_aumento = pena_provisoria
 
-    # 1. CAUSAS DE AUMENTO
     st.subheader("Causas de Aumento (Gerais e Especiais)")
     tem_aumento = st.radio("Há causas de AUMENTO?", ("Não", "Sim"), horizontal=True, key="radio_aum")
 
@@ -224,16 +191,14 @@ with tab4:
             fracao_aumento_total += parse_fraction(frac_str)
 
     if fracao_aumento_total > 0:
-        # Aumento é sobre a pena provisória
         aumento_3fase = pena_provisoria * fracao_aumento_total
         pena_apos_aumento = pena_provisoria + aumento_3fase
         st.write(f"Fração total de aumento: {fracao_aumento_total:.2f} ({fracao_aumento_total*100:.0f}%)")
         st.write(f"Aumento aplicado: +{aumento_3fase:.2f} anos")
         st.write(f"**Pena após aumento:** {pena_apos_aumento:.2f} anos")
     else:
-        pena_apos_aumento = pena_provisoria # Sem aumento, segue o valor
+        pena_apos_aumento = pena_provisoria
 
-    # 2. CAUSAS DE DIMINUIÇÃO
     st.subheader("Causas de Diminuição (Gerais e Especiais)")
     tem_diminuicao = st.radio("Há causas de DIMINUIÇÃO?", ("Não", "Sim"), horizontal=True, key="radio_dim")
 
@@ -248,25 +213,21 @@ with tab4:
             fracao_diminuicao_total += parse_fraction(frac_str)
 
     if fracao_diminuicao_total > 0:
-        # Diminuição é sobre a pena JÁ AUMENTADA
         reducao_3fase = pena_apos_aumento * fracao_diminuicao_total
         pena_definitiva = pena_apos_aumento - reducao_3fase
         st.write(f"Fração total de diminuição: {fracao_diminuicao_total:.2f} ({fracao_diminuicao_total*100:.0f}%)")
         st.write(f"Redução aplicada: -{reducao_3fase:.2f} anos")
     else:
-        pena_definitiva = pena_apos_aumento # Sem diminuição, usa o valor pós-aumento
+        pena_definitiva = pena_apos_aumento
 
-    # Na 3ª fase, a pena pode ficar abaixo do mínimo ou acima do máximo
     if pena_definitiva < 0:
         pena_definitiva = 0.0
 
     st.metric("Pena Definitiva (Resultado da 3ª Fase):", f"{pena_definitiva:.2f} anos")
 
-# --- ABA 5: RESULTADO FINAL ---
 with tab5:
     st.header("Análise Final: Regime e Substituição")
 
-    # --- Fixação do Regime ---
     st.subheader("Fixação do Regime Penal (Art. 33 CP)")
 
     regime = "Indefinido"
@@ -275,10 +236,8 @@ with tab5:
     if pena_definitiva > 8:
         regime = "FECHADO"
     elif pena_definitiva > 4:
-        # Pena entre 4 e 8 anos
         regime = "FECHADO" if reincidente else "SEMIABERTO"
     else:
-        # Pena <= 4 anos
         if reincidente:
             if count_negativas == 0:
                 regime = "SEMIABERTO (Súmula 269, STJ)"
@@ -287,7 +246,6 @@ with tab5:
         else:
             regime = "ABERTO"
 
-    # Verificação da Súmula 440, STJ
     if count_negativas == 0 and not reincidente and regime != "ABERTO" and pena_definitiva <= 4:
         regime = "ABERTO"
         st.info("Súmula 440 STJ: Pena-base no mínimo legal e réu primário. Regime ABERTO é o aplicável.")
@@ -295,43 +253,93 @@ with tab5:
     st.metric("Regime Inicial de Cumprimento Sugerido:", regime)
     st.write("---")
 
-    # --- Substituição da Pena ---
+    regime_simplificado = "Indefinido"
+    if "FECHADO" in regime.upper():
+        regime_simplificado = "Fechado"
+    elif "SEMIABERTO" in regime.upper():
+        regime_simplificado = "Semiaberto"
+    elif "ABERTO" in regime.upper():
+        regime_simplificado = "Aberto"
+
+    st.subheader("Contexto: População em Estabelecimentos Penais por Regime (Fonte: Sisdepen)")
+    st.markdown("""
+    O gráfico de rosca abaixo utiliza dados públicos (Sisdepen) para contextualizar o resultado.
+    """)
+
+    data_cnj = {
+        'Regime': ['Fechado', 'Semiaberto', 'Aberto'],
+        'NumeroDePessoas': [385102, 111404, 3230],
+        'Porcentagem': [77.1, 22.3, 0.6]
+    }
+    df_cnj = pd.DataFrame(data_cnj)
+
+    domain_cnj = ['Fechado', 'Semiaberto', 'Aberto']
+    range_cnj = ['#D9534F', '#F0AD4E', '#5CB85C']
+
+    base = alt.Chart(df_cnj).encode(
+       theta=alt.Theta("Porcentagem", stack=True)
+    )
+
+    pie = base.mark_arc(outerRadius=120, innerRadius=80).encode(
+        color=alt.Color('Regime',
+                        scale=alt.Scale(
+                            domain=domain_cnj,
+                            range=range_cnj
+                        ),
+                        legend=alt.Legend(title="Regimes")
+                       ),
+        order=alt.Order('Porcentagem', sort='descending'),
+        tooltip=['Regime', 'NumeroDePessoas', alt.Tooltip('Porcentagem', format='.1f')]
+    ).properties(
+        title="Distribuição de Pessoas por Regime (Fonte: Sisdepen)"
+    )
+
+    text = base.mark_text(radius=140).encode(
+        text=alt.Text('Porcentagem', format=".1f"),
+        order=alt.Order('Porcentagem', sort='descending'),
+        color=alt.value("black")
+    )
+    
+    chart_donut = pie + text
+    
+    st.altair_chart(chart_donut, use_container_width=True)
+
+    if regime_simplificado != "Indefinido" and regime_simplificado in df_cnj['Regime'].values:
+        dados_regime = df_cnj[df_cnj['Regime'] == regime_simplificado].iloc[0]
+        st.info(f"""
+        **Adequação:** O seu caso se enquadra no **{dados_regime['Regime']}**. 
+        Nos dados de referência, esta categoria representa **{dados_regime['Porcentagem']}%** do total, 
+        correspondendo a **{dados_regime['NumeroDePessoas']:,.0f}** pessoas.
+        """.replace(",", "."))
+    
+    st.write("---")
+
     st.subheader("Substituição da Pena (Art. 44 CP)")
     st.write("Responda aos requisitos para análise da substituição:")
 
-    # Requisito 1 (Objetivo: Pena)
     req1_bool = (pena_definitiva <= 4)
     st.checkbox(
         f"Requisito 1: Pena aplicada é igual ou inferior a 4 anos? (Resultado: {pena_definitiva:.2f} anos)",
         value=req1_bool,
         disabled=True
     )
-
-    # Requisito 2 (Objetivo: Crime)
     req2_bool = st.radio(
         "Requisito 2: O crime foi cometido SEM violência ou grave ameaça à pessoa?",
         ("Sim", "Não")
     ) == "Sim"
-
-    # Requisito 3 (Subjetivo: Reincidência)
     req3_bool = st.radio(
         "Requisito 3: O réu é NÃO reincidente em crime doloso?",
         ("Sim", "Não")
     ) == "Sim"
-
-    # Requisito 4 (Subjetivo: Circunstâncias)
     req4_bool = st.radio(
         "Requisito 4: As circunstâncias judiciais (Art. 59) indicam que a substituição é suficiente?",
         ("Sim", "Não")
     ) == "Sim"
 
-    # Lógica Final da Substituição
     elegivel = False
     if req1_bool and req2_bool and req3_bool and req4_bool:
-        # Caso padrão: primário, bons antecedentes, etc.
         elegivel = True
     elif req1_bool and req2_bool and not req3_bool:
-        # Caso do § 3º do Art. 44 (Reincidente)
         st.info("O réu é reincidente, mas a substituição AINDA PODE ser possível (Art. 44, § 3º).")
         excecao_reincidente = st.checkbox("A medida é socialmente recomendável E a reincidência não se operou pelo mesmo crime?")
         if excecao_reincidente and req4_bool:
