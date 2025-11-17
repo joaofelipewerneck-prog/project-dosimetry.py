@@ -17,7 +17,7 @@ def parse_fraction(frac_str: str) -> float:
 
 st.set_page_config(layout="wide")
 
-st.image("logo_fgv_dosimetria.png", width=400)
+st.image("logo_fgv_dosimetria.png", width=300)
 
 st.title("⚖️ Calculadora de Dosimetria da Pena")
 st.markdown("Simulador do Método Trifásico (Art. 68 do Código Penal)")
