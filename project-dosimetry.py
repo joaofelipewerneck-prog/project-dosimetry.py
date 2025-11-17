@@ -261,6 +261,51 @@ with tab5:
     elif "ABERTO" in regime.upper():
         regime_simplificado = "Aberto"
 
+with tab5:
+    st.header("Análise Final: Regime e Substituição")
+    
+
+    st.subheader("Progressão da Pena (Fase a Fase)")
+    
+    data_jornada = {
+        "Etapa": [
+            "A. Pena Mínima", 
+            "B. Pena-Base (Fase 1)", 
+            "C. Pena Provisória (Fase 2)", 
+            "D. Pena Definitiva (Fase 3)"
+        ],
+        "Anos": [
+            pena_minima_cominada, 
+            st.session_state.pena_base, 
+            st.session_state.pena_provisoria, 
+            st.session_state.pena_definitiva 
+        ]
+    }
+    df_jornada = pd.DataFrame(data_jornada)
+
+    chart_jornada = alt.Chart(df_jornada).mark_bar(
+        color="#00629B" 
+    ).encode(
+        x=alt.X('Etapa', sort=None, title=None), 
+        y=alt.Y('Anos', title="Pena (em Anos)"),
+        tooltip=['Etapa', 'Anos']
+    ).properties(
+        title="Jornada da Pena"
+    )
+    
+    text = chart_jornada.mark_text(
+        align='center',
+        baseline='bottom',
+        dy=-5 # Desloca o texto um pouco para cima da barra
+    ).encode(
+        text=alt.Text('Anos', format=".2f")
+    )
+
+    st.altair_chart(chart_jornada + text, use_container_width=True)
+
+    st.write("---")
+
+    
     st.subheader("Contexto: População em Estabelecimentos Penais por Regime (Fonte: Sisdepen)")
     st.markdown("""
     O gráfico de rosca abaixo utiliza dados públicos (Sisdepen) para contextualizar o resultado.
@@ -354,5 +399,3 @@ with tab5:
     st.markdown("""
     **Aviso Legal:** Esta é uma ferramenta de simulação e aprendizado, baseada nas regras gerais do Código Penal Brasileiro e em Súmulas de tribunais superiores. Ela não substitui a análise de um juiz ou advogado, que considera a totalidade e as nuances do caso concreto. As interpretações (como o valor da fração na 1ª fase) podem variar.
     """)
-    st.header("Análise Final: Regime e Substituição")
-    # ... (resto do seu código da análise final) ..
